@@ -219,17 +219,17 @@ plot_tsne <- function(data, fill_var, title_text, palette) {
 }
 
 p_tsne_outcome <- plot_tsne(
-  tsne_df, "Outcome", "t-SNE: Recidivism vs. Remission",
+  tsne_df, "Outcome", "Fig. 2A-2",
   c("Recidivism" = "#E41A1C", "Remission" = "#377EB8")
 )
 
 p_tsne_tissue <- plot_tsne(
-  tsne_df, "Status", "t-SNE: Tumour vs. Healthy",
+  tsne_df, "Status", "Fig. 2A-1",
   c("Tumour" = "orange", "Healthy" = "#4DAF4A")
 )
 
 p_tsne_source <- plot_tsne(
-  tsne_df, "Source", "t-SNE: TCGA vs. KI",
+  tsne_df, "Source", "SF-2A",
   c("TCGA" = "#93C47D", "KI" = "#912F6C")
 )
 
