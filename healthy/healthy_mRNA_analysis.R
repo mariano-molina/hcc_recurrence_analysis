@@ -23,8 +23,6 @@
 # Notes:
 # - One predefined outlier sample (27.A033.303.Tumor) is excluded
 #   based on QC and downstream inspection.
-# - This script follows the same preprocessing and sample-matching
-#   logic as the tumour and miRNA submission-ready scripts.
 # ============================================================
 
 # ============================================================
