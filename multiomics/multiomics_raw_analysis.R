@@ -14,9 +14,9 @@
 # - data/mRNA_miRNA_patient_sample_info.csv
 #
 # Output:
-# - results/figure4/
-# - results/figure4/objects/
-# - results/figure4/tables/
+# - results/figures
+# - results/objects/
+# - results/tables/
 #
 # Notes:
 # - Uses harmonized matched mRNA + miRNA samples
