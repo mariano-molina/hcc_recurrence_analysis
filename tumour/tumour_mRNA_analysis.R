@@ -1,5 +1,5 @@
 # ============================================================
-# Liver tumour recurrence analysis
+# Liver tumour recurrence analysis - mRNA
 #
 # Author: MAM
 # Date: April 2026
