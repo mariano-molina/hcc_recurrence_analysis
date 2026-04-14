@@ -6,13 +6,20 @@ This repository contains the scripts used for the analyses presented in the manu
 
 ## Overview
 
-The scripts reproduce the main analyses, including:
-- Data preprocessing and sample harmonization
-- t-SNE visualization
-- PLS-DA modelling
-- Within-cohort cross-validation
-- Cross-cohort transfer analyses
-- Candidate gene evaluation
+This repository contains the analysis scripts used to investigate the biological origin and stability of recurrence-associated molecular signals in hepatocellular carcinoma (HCC).
+
+The study systematically compares tumor and adjacent (non-tumorous) liver tissue across independent cohorts to determine where reproducible and clinically relevant recurrence signals reside.
+
+Key analyses include:
+- Comparative analysis of tumor vs adjacent tissue for recurrence prediction
+- Cross-cohort validation (HCC-KI ↔ HCC-TCGA) to assess generalizability
+- Multiomic integration (mRNA + miRNA)
+- Identification of coherent biological programs associated with recurrence, including:
+  * Increased ribosome biogenesis and RNA processing
+  * Decreased immune-related signaling
+- Evaluation of signal stability and transferability across datasets
+
+The results demonstrate that recurrence-associated molecular signals are more stable and biologically coherent in the tumor-adjacent liver microenvironment than in tumor tissue.
 
 ## Versions
 
