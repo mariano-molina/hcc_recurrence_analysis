@@ -34,9 +34,7 @@
 # Notes:
 # - One predefined tumour outlier sample is excluded:
 #   X27.A033.303.Tumor
-# - mRNA preprocessing follows the submission-ready mRNA logic
-# - miRNA preprocessing follows the submission-ready miRNA logic
-# - Batch variable is cohort/source (KI vs TCGA)
+## - Batch variable is cohort/source (KI vs TCGA)
 # - ComBat protects recurrence status during correction
 # ============================================================
 
