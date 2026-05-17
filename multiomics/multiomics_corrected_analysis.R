@@ -1777,3 +1777,341 @@ write.csv(
   file.path(output_dir, "viral_status_counts.csv"),
   row.names = FALSE
 )
+
+# ============================================================
+# 14. Computing adjacent ribosome and immune program scores
+# ============================================================
+
+suppressPackageStartupMessages({
+  library(GSVA)
+  library(GSEABase)
+  library(org.Hs.eg.db)
+  library(AnnotationDbi)
+  library(GO.db)
+})
+
+expr_mat_healthy <- t(expr_healthy)  # genes/features x samples
+
+pathway_terms <- c(
+  "ribosome biogenesis",
+  "rRNA processing",
+  "MHC class II protein complex assembly",
+  "immunoglobulin production"
+)
+
+go_map <- AnnotationDbi::select(
+  GO.db,
+  keys = pathway_terms,
+  columns = c("GOID", "TERM"),
+  keytype = "TERM"
+)
+
+go_map <- unique(go_map[, c("GOID", "TERM")])
+go_map <- go_map[!is.na(go_map$GOID), ]
+
+gene_sets_list <- lapply(seq_len(nrow(go_map)), function(i) {
+  go_id <- go_map$GOID[i]
+  
+  genes_df <- AnnotationDbi::select(
+    org.Hs.eg.db,
+    keys = go_id,
+    columns = c("SYMBOL"),
+    keytype = "GOALL"
+  )
+  
+  unique(na.omit(genes_df$SYMBOL))
+})
+
+names(gene_sets_list) <- go_map$TERM
+
+gene_sets_list <- lapply(gene_sets_list, function(gs) {
+  intersect(gs, rownames(expr_mat_healthy))
+})
+
+gene_sets_list <- gene_sets_list[sapply(gene_sets_list, length) >= 10]
+
+if (length(gene_sets_list) == 0) {
+  stop("No valid GO gene sets remained after filtering.")
+}
+
+ssgsea_scores_healthy <- gsva(
+  expr = as.matrix(expr_mat_healthy),
+  gset.idx.list = gene_sets_list,
+  method = "ssgsea",
+  kcdf = "Gaussian",
+  abs.ranking = FALSE,
+  verbose = FALSE
+)
+
+program_score_df <- as.data.frame(t(ssgsea_scores_healthy))
+program_score_df$Sample <- rownames(program_score_df)
+
+ribosome_cols <- intersect(
+  c("ribosome biogenesis", "rRNA processing"),
+  colnames(program_score_df)
+)
+
+immune_cols <- intersect(
+  c("MHC class II protein complex assembly", "immunoglobulin production"),
+  colnames(program_score_df)
+)
+
+if (length(ribosome_cols) == 0) {
+  stop("No ribosome-related program columns were found.")
+}
+
+if (length(immune_cols) == 0) {
+  stop("No immune-related program columns were found.")
+}
+
+program_score_df$RibosomeScore <- rowMeans(
+  program_score_df[, ribosome_cols, drop = FALSE],
+  na.rm = TRUE
+)
+
+program_score_df$ImmuneScore <- rowMeans(
+  program_score_df[, immune_cols, drop = FALSE],
+  na.rm = TRUE
+)
+
+write.csv(
+  program_score_df,
+  file.path(output_dir, "adjacent_program_scores_batch_corrected.csv"),
+  row.names = FALSE
+)
+
+
+# ============================================================
+# 15. Adding ribosome + immune programs to recurrence model
+# ============================================================
+
+clinical_df2 <- clinical_df2 %>%
+  dplyr::select(
+    -dplyr::matches("^RibosomeScore$"),
+    -dplyr::matches("^ImmuneScore$"),
+    -dplyr::matches("^RibosomeScore\\.[xy]$"),
+    -dplyr::matches("^ImmuneScore\\.[xy]$")
+  ) %>%
+  left_join(
+    program_score_df %>%
+      dplyr::select(Sample, RibosomeScore, ImmuneScore),
+    by = "Sample"
+  )
+
+model_df_programs <- clinical_df2 %>%
+  dplyr::select(
+    Outcome,
+    RecurrenceScore,
+    RibosomeScore,
+    ImmuneScore,
+    Cirrosis,
+    Milan,
+    PS
+  ) %>%
+  na.omit()
+
+model_df_programs$Outcome <- factor(
+  model_df_programs$Outcome,
+  levels = c("Remission", "Recidivism")
+)
+
+model_df_programs$Score_z <- as.numeric(scale(model_df_programs$RecurrenceScore))
+model_df_programs$Ribosome_z <- as.numeric(scale(model_df_programs$RibosomeScore))
+model_df_programs$Immune_z <- as.numeric(scale(model_df_programs$ImmuneScore))
+
+
+# ------------------------------------------------------------
+# Models
+# ------------------------------------------------------------
+
+model_de <- glm(
+  Outcome ~ Score_z + Cirrosis + Milan + PS,
+  data = model_df_programs,
+  family = binomial
+)
+
+model_programs <- glm(
+  Outcome ~ Ribosome_z + Immune_z + Cirrosis + Milan + PS,
+  data = model_df_programs,
+  family = binomial
+)
+
+model_combined <- glm(
+  Outcome ~ Score_z + Ribosome_z + Immune_z + Cirrosis + Milan + PS,
+  data = model_df_programs,
+  family = binomial
+)
+
+
+# ------------------------------------------------------------
+# ROC / AUC
+# ------------------------------------------------------------
+
+roc_de <- roc(
+  model_df_programs$Outcome,
+  predict(model_de, type = "response"),
+  levels = c("Remission", "Recidivism"),
+  direction = "<"
+)
+
+roc_programs <- roc(
+  model_df_programs$Outcome,
+  predict(model_programs, type = "response"),
+  levels = c("Remission", "Recidivism"),
+  direction = "<"
+)
+
+roc_combined <- roc(
+  model_df_programs$Outcome,
+  predict(model_combined, type = "response"),
+  levels = c("Remission", "Recidivism"),
+  direction = "<"
+)
+
+cat("\n==============================\n")
+cat("AUC comparison\n")
+cat("==============================\n")
+
+cat("DE score model: ",
+    round(as.numeric(auc(roc_de)), 3), "\n")
+
+cat("Program model: ",
+    round(as.numeric(auc(roc_programs)), 3), "\n")
+
+cat("Combined model: ",
+    round(as.numeric(auc(roc_combined)), 3), "\n")
+
+cat("\n==============================\n")
+cat("AIC comparison\n")
+cat("==============================\n")
+
+print(AIC(model_de, model_programs, model_combined))
+
+
+# ------------------------------------------------------------
+# Correlation check
+# ------------------------------------------------------------
+
+cor_matrix <- cor(
+  model_df_programs[, c("Score_z", "Ribosome_z", "Immune_z")],
+  method = "spearman",
+  use = "pairwise.complete.obs"
+)
+
+print(cor_matrix)
+
+
+# ------------------------------------------------------------
+# Save model comparison table
+# ------------------------------------------------------------
+
+ci_de <- ci.auc(roc_de)
+ci_programs <- ci.auc(roc_programs)
+ci_combined <- ci.auc(roc_combined)
+
+model_comparison_df <- data.frame(
+  Model = c("Adjacent score", "Pathway programs", "Combined model"),
+  AUC = c(
+    as.numeric(auc(roc_de)),
+    as.numeric(auc(roc_programs)),
+    as.numeric(auc(roc_combined))
+  ),
+  CI_lower = c(ci_de[1], ci_programs[1], ci_combined[1]),
+  CI_upper = c(ci_de[3], ci_programs[3], ci_combined[3]),
+  AIC = c(
+    AIC(model_de),
+    AIC(model_programs),
+    AIC(model_combined)
+  ),
+  stringsAsFactors = FALSE
+)
+
+write.csv(
+  model_comparison_df,
+  file.path(output_dir, "adjacent_score_program_model_comparison.csv"),
+  row.names = FALSE
+)
+
+write.csv(
+  cor_matrix,
+  file.path(output_dir, "adjacent_score_program_correlation_matrix.csv")
+)
+
+
+# ------------------------------------------------------------
+# Single ROC plot: DE score, programs, and combined model
+# ------------------------------------------------------------
+
+roc_list <- list(
+  roc_de,
+  roc_programs,
+  roc_combined
+)
+
+names(roc_list) <- c(
+  paste0(
+    "Adjacent score\nAUC = ",
+    round(as.numeric(auc(roc_de)), 3),
+    " (95% CI ",
+    round(ci_de[1], 3), "-",
+    round(ci_de[3], 3), ")"
+  ),
+  
+  paste0(
+    "Pathway programs\nAUC = ",
+    round(as.numeric(auc(roc_programs)), 3),
+    " (95% CI ",
+    round(ci_programs[1], 3), "-",
+    round(ci_programs[3], 3), ")"
+  ),
+  
+  paste0(
+    "Combined model\nAUC = ",
+    round(as.numeric(auc(roc_combined)), 3),
+    " (95% CI ",
+    round(ci_combined[1], 3), "-",
+    round(ci_combined[3], 3), ")"
+  )
+)
+
+p_roc_combined_models <- ggroc(
+  roc_list,
+  legacy.axes = TRUE,
+  linewidth = 1.2
+) +
+  coord_cartesian(xlim = c(0, 1), ylim = c(0, 1), clip = "off") +
+  theme_minimal(base_size = 14) +
+  labs(
+    title = "Fig. 5G",
+    x = "1 - Specificity",
+    y = "Sensitivity",
+    color = NULL
+  ) +
+  scale_color_manual(
+    values = c(
+      "#4D4D4D",
+      "#6BAED6",
+      "#912F6C"
+    )
+  ) +
+  theme(
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.line = element_line(color = "black"),
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    legend.position = c(0.58, 0.24),
+    legend.background = element_rect(
+      fill = alpha("white", 0.85),
+      color = NA
+    ),
+    legend.text = element_text(size = 8.5),
+    legend.key.width = unit(0.7, "cm"),
+    legend.spacing.y = unit(0.05, "cm")
+  )
+
+ggsave(
+  file.path(figure_dir, "roc_de_program_combined_clinical.pdf"),
+  p_roc_combined_models,
+  width = 5,
+  height = 4
+)
