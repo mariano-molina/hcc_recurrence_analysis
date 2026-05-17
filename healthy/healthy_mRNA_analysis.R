@@ -918,7 +918,7 @@ p_rem_drivers <- ggplot(top_rem_drivers, aes(x = n_occurrences, y = Gene)) +
   geom_segment(aes(x = 0, xend = n_occurrences, y = Gene, yend = Gene), color = "grey70", linewidth = 1) +
   geom_point(size = 4, color = "#377EB8") +
   theme_minimal(base_size = 12) +
-  labs(title = "Top recurrent leading-edge genes: Remission, SF-4I", x = "Recurrent leading-edge genes", y = NULL)
+  labs(title = "Top recurrent leading-edge genes: Remission, Fig. 3E", x = "Recurrent leading-edge genes", y = NULL)
 
 ggsave(file.path(figure_dir, "healthy_recurrent_leading_edge_genes.pdf"), p_recid_drivers + p_rem_drivers, width = 10, height = 5)
 
@@ -1085,7 +1085,7 @@ make_program_corr_plot <- function(df, cor_obj, title_text, label_left = FALSE) 
 }
 
 p_tcga_corr <- make_program_corr_plot(program_tcga, cor_tcga, "TCGA, Fig. 3F", label_left = FALSE)
-p_ki_corr   <- make_program_corr_plot(program_ki, cor_ki, "KI, SF-4K", label_left = TRUE)
+p_ki_corr   <- make_program_corr_plot(program_ki, cor_ki, "KI, SF-4J", label_left = TRUE)
 
 ggsave(file.path(figure_dir, "healthy_program_correlation_tcga.pdf"), p_tcga_corr, width = 6, height = 5)
 ggsave(file.path(figure_dir, "healthy_program_correlation_ki.pdf"), p_ki_corr, width = 6, height = 5)
