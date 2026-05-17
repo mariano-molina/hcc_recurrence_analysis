@@ -727,7 +727,79 @@ p_dot <- ggplot(dot_df %>% filter(Present), aes(x = Model, y = miRNA, size = Poi
 ggsave(file.path(figure_dir, "mirna_overlap_dotplot.pdf"), p_dot, width = 7, height = 6)
 
 # ============================================================
-# 8. Candidate-miRNA violin plot
+# 8. Shared miRNA overlap across models: UpSet plot
+# ============================================================
+
+library(UpSetR)
+
+top_n <- 20
+
+mirna_lists_upset <- list(
+  TCGA_KI = ranked_mirna_tcga_ki[1:min(top_n, length(ranked_mirna_tcga_ki))],
+  KI_TCGA = ranked_mirna_ki_tcga[1:min(top_n, length(ranked_mirna_ki_tcga))],
+  TCGA_CV = ranked_mirna_tcga_cv[1:min(top_n, length(ranked_mirna_tcga_cv))],
+  KI_CV   = ranked_mirna_ki_cv[1:min(top_n, length(ranked_mirna_ki_cv))]
+)
+
+mirna_lists_upset <- lapply(mirna_lists_upset, function(x) unique(na.omit(x)))
+
+upset_mat <- UpSetR::fromList(mirna_lists_upset)
+
+upset_mat <- upset_mat[rowSums(upset_mat) >= 1, , drop = FALSE]
+
+while (dev.cur() > 1) dev.off()
+
+UpSetR::upset(
+  upset_mat,
+  sets = c("TCGA_CV", "TCGA_KI", "KI_CV", "KI_TCGA"),
+  keep.order = TRUE,
+  order.by = "freq",
+  nintersects = NA,
+  mainbar.y.label = "Intersection size",
+  sets.x.label = "miRNAs per model",
+  text.scale = 1.4
+)
+
+dev.copy(
+  pdf,
+  file = file.path(figure_dir, "mirna_shared_top20_features_upset.pdf"),
+  width = 8,
+  height = 5
+)
+dev.off()
+
+# Save shared miRNA table
+all_mirnas <- sort(unique(unlist(mirna_lists_upset)))
+
+shared_mirna_table <- data.frame(
+  miRNA = all_mirnas,
+  TCGA_CV = all_mirnas %in% mirna_lists_upset[["TCGA_CV"]],
+  TCGA_KI = all_mirnas %in% mirna_lists_upset[["TCGA_KI"]],
+  KI_CV   = all_mirnas %in% mirna_lists_upset[["KI_CV"]],
+  KI_TCGA = all_mirnas %in% mirna_lists_upset[["KI_TCGA"]],
+  stringsAsFactors = FALSE
+)
+
+shared_mirna_table$N_models <- rowSums(shared_mirna_table[, -1])
+
+shared_mirna_table <- shared_mirna_table[
+  order(-shared_mirna_table$N_models, shared_mirna_table$miRNA),
+]
+
+write.csv(
+  shared_mirna_table,
+  file.path(output_dir, "mirna_shared_top20_features_across_models.csv"),
+  row.names = FALSE
+)
+
+write.csv(
+  shared_mirna_table[shared_mirna_table$N_models >= 2, ],
+  file.path(output_dir, "mirna_shared_top20_features_present_in_multiple_models.csv"),
+  row.names = FALSE
+)
+                            
+# ============================================================
+# 9. Candidate-miRNA violin plot
 # ============================================================
 
 mirnas_of_interest <- c("hsa-miR-2355-5p")
