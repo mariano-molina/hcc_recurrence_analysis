@@ -687,6 +687,83 @@ p_genes <- ggplot(plot_long, aes(x = Outcome, y = Expression, fill = Outcome)) +
 ggsave(file.path(figure_dir, "candidate_gene_boxplots.pdf"), p_genes, width = 7, height = 6)
 
 # ============================================================
+# 8. Shared feature overlap across models: UpSet plot
+# ============================================================
+
+library(UpSetR)
+
+top_n <- 20
+
+gene_lists <- list(
+  TCGA_KI = ranked_genes_tcga_ki[1:min(top_n, length(ranked_genes_tcga_ki))],
+  KI_TCGA = ranked_genes_ki_tcga[1:min(top_n, length(ranked_genes_ki_tcga))],
+  TCGA_CV = ranked_genes_tcga_cv[1:min(top_n, length(ranked_genes_tcga_cv))],
+  KI_CV   = ranked_genes_ki_cv[1:min(top_n, length(ranked_genes_ki_cv))]
+)
+
+# Remove NA and duplicated genes
+gene_lists <- lapply(gene_lists, function(x) unique(na.omit(x)))
+
+# Create binary matrix
+upset_mat <- UpSetR::fromList(gene_lists)
+
+# Keep genes present in at least one model
+upset_mat <- upset_mat[rowSums(upset_mat) >= 1, ]
+
+while (dev.cur() > 1) dev.off()
+
+# Plot to RStudio viewer
+UpSetR::upset(
+  upset_mat,
+  sets = c("TCGA_CV","TCGA_KI","KI_CV","KI_TCGA"),
+  keep.order = TRUE,
+  order.by = "freq",
+  nintersects = NA,
+  mainbar.y.label = "Intersection size",
+  sets.x.label = "Genes per model",
+  text.scale = 1.4
+)
+
+# Save currently displayed plot as PDF
+dev.copy(
+  pdf,
+  file = file.path(figure_dir, "shared_top20_features_upset.pdf"),
+  width = 8,
+  height = 5
+)
+dev.off()
+
+# Save shared gene table
+all_genes <- sort(unique(unlist(gene_lists)))
+
+shared_gene_table <- data.frame(
+  Gene = all_genes,
+  TCGA_CV = all_genes %in% gene_lists[["TCGA_CV"]],
+  TCGA_KI = all_genes %in% gene_lists[["TCGA_KI"]],
+  KI_CV   = all_genes %in% gene_lists[["KI_CV"]],
+  KI_TCGA = all_genes %in% gene_lists[["KI_TCGA"]],
+  stringsAsFactors = FALSE
+)
+
+shared_gene_table$N_models <- rowSums(shared_gene_table[, -1])
+
+shared_gene_table <- shared_gene_table[
+  order(-shared_gene_table$N_models, shared_gene_table$Gene),
+]
+
+write.csv(
+  shared_gene_table,
+  file.path(output_dir, "shared_top20_features_across_models.csv"),
+  row.names = FALSE
+)
+
+write.csv(
+  shared_gene_table[shared_gene_table$N_models >= 2, ],
+  file.path(output_dir, "shared_top20_features_present_in_multiple_models.csv"),
+  row.names = FALSE
+)
+                
+# ============================================================
 # 9. Candidate-gene ROC comparison
 # ============================================================
 
