@@ -2082,7 +2082,7 @@ p_roc_combined_models <- ggroc(
   coord_cartesian(xlim = c(0, 1), ylim = c(0, 1), clip = "off") +
   theme_minimal(base_size = 14) +
   labs(
-    title = "Fig. 5G",
+    title = "Fig. 5F",
     x = "1 - Specificity",
     y = "Sensitivity",
     color = NULL
